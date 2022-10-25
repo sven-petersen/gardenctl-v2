@@ -20,6 +20,7 @@ import (
 	"github.com/gardener/gardener/pkg/utils/secrets"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -569,4 +570,49 @@ var _ = Describe("SSH Options", func() {
 
 		Expect(o.Validate()).NotTo(Succeed())
 	})
+
+	DescribeTable("Prompt should print question and should return...", func(defaultAnswer bool, answer string, expectedResult bool) {
+		question := "Is 42 the ultimate answer?"
+		expectedPrompt := question
+		if defaultAnswer {
+			expectedPrompt += " [n/Y]: "
+		} else {
+			expectedPrompt += " [y/N]: "
+		}
+		streams, stdin, stdout, _ := util.NewTestIOStreams()
+
+		stdin.Write([]byte(answer))
+		result := ssh.Confirm(streams, question, defaultAnswer)
+		stdoutStr := stdout.String()
+
+		Expect(stdoutStr).To(Equal(expectedPrompt))
+		Expect(result).To(Equal(expectedResult))
+	},
+		Entry("true  (defaultAnswer: false, given answer: y )", false, "y", true),
+		Entry("false (defaultAnswer: false, given answer: n )", false, "n", false),
+		Entry("false (defaultAnswer: false, given answer: \\n)", false, "\n", false),
+		Entry("true  (defaultAnswer: true , given answer: yEs )", true, "yEs", true),
+		Entry("false (defaultAnswer: true , given answer: nO )", true, "nO", false),
+		Entry("true  (defaultAnswer: true , given answer: \\n)", true, "\n", true),
+	)
+
+	FDescribeTable("Should prompt for confirmation in case of /0 CIDRs without force-flag", func(cidr string, forceFlag, shouldConfirm bool) {
+		o := ssh.NewSSHOptions(streams)
+		o.CIDRs = []string{cidr}
+		o.SSHPublicKeyFile = publicSSHKeyFile
+		o.Force = forceFlag
+		confirmCalled := false
+		ssh.SetConfirm(func(ioStreams util.IOStreams, question string, defaultAnswer bool) bool {
+			confirmCalled = true
+			return true
+		})
+		o.Validate()
+		Expect(confirmCalled).To(Equal(shouldConfirm))
+	},
+		Entry("testing CIDR 8.8.8.8/0 without force flag", "8.8.8.8/0", false, true),
+		Entry("testing CIDR 8.8.8.8/16 without force flag", "8.8.8.8/16", false, false),
+		Entry("testing CIDR 8.8.8.8/0 with force flag", "8.8.8.8/0", true, false),
+		Entry("testing CIDR ::/0 without force flag", "::/0", false, true),
+		Entry("testing CIDR ::/32 without force flag", "::/32", false, false),
+	)
 })

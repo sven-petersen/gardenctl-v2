@@ -7,6 +7,8 @@ SPDX-License-Identifier: Apache-2.0
 package ssh
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -151,6 +153,34 @@ var (
 
 		return cmd.Run()
 	}
+
+	// Displays a prompt to the user to confirm (yes/no) something
+	confirm = func(ioStreams util.IOStreams, question string, defaultAnswer bool) bool {
+		reader := bufio.NewReader(ioStreams.In)
+
+		choices := "y/N"
+		if defaultAnswer {
+			choices = "n/Y"
+		}
+
+		for {
+			fmt.Fprint(ioStreams.Out, question+" ["+choices+"]: ")
+
+			str, _ := reader.ReadString('\n')
+
+			str = strings.TrimSpace(str)
+			str = strings.ToLower(str)
+
+			switch str {
+			case "":
+				return defaultAnswer
+			case "n", "no":
+				return false
+			case "y", "yes":
+				return true
+			}
+		}
+	}
 )
 
 // SSHOptions is a struct to support ssh command
@@ -199,6 +229,10 @@ type SSHOptions struct {
 	// bastion once it exits. By default it deletes it, but we allow the user to
 	// keep it for debugging purposes.
 	KeepBastion bool
+
+	// Force will silence warnings and interactive prompts. The latter happens if the user
+	// specifies a /32/large/ CIDR range which usually requires the users confirmation.
+	Force bool
 }
 
 // NewSSHOptions returns initialized SSHOptions
@@ -301,8 +335,23 @@ func (o *SSHOptions) Validate() error {
 	}
 
 	for _, cidr := range o.CIDRs {
-		if _, _, err := net.ParseCIDR(cidr); err != nil {
+		_, netIP, err := net.ParseCIDR(cidr)
+		if err != nil {
 			return fmt.Errorf("CIDR %q is invalid: %w", cidr, err)
+		}
+
+		mask := []byte{0, 0, 0, 0}
+		if netIP.IP.To4() == nil {
+			// is an IPv6
+			mask = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+		}
+
+		if !o.Force && bytes.Compare(netIP.Mask, mask) <= 0 {
+			question := fmt.Sprintf("Large CIDR range %s compromises security. Continue?", cidr)
+			if !confirm(o.IOStreams, question, false) {
+				// return fmt.Errorf("")
+				os.Exit(0)
+			}
 		}
 	}
 

@@ -10,6 +10,8 @@ import (
 	"context"
 	"os"
 	"time"
+
+	"github.com/gardener/gardenctl-v2/internal/util"
 )
 
 func SetBastionAvailabilityChecker(f func(hostname string, privateKey []byte) error) {
@@ -41,4 +43,10 @@ func SetKeepAliveInterval(d time.Duration) {
 	defer keepAliveIntervalMutex.Unlock()
 
 	keepAliveInterval = d
+}
+
+var Confirm = confirm
+
+func SetConfirm(f func(ioStreams util.IOStreams, question string, defaultAnswer bool) bool) {
+	confirm = f
 }

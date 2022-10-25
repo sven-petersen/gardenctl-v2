@@ -42,6 +42,7 @@ func NewCmdSSH(f util.Factory, o *SSHOptions) *cobra.Command {
 	cmd.Flags().StringVar(&o.SSHPublicKeyFile, "public-key-file", "", "Path to the file that contains a public SSH key. If not given, a temporary keypair will be generated.")
 	cmd.Flags().DurationVar(&o.WaitTimeout, "wait-timeout", o.WaitTimeout, "Maximum duration to wait for the bastion to become available.")
 	cmd.Flags().BoolVar(&o.KeepBastion, "keep-bastion", o.KeepBastion, "Do not delete immediately when gardenctl exits (Bastions will be garbage-collected after some time)")
+	cmd.Flags().BoolVar(&o.Force, "force", o.Force, "Do not show warnings and do not prompt for confirmation. Does not affect access control warnings.")
 
 	return cmd
 }
