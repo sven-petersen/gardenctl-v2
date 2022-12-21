@@ -7,10 +7,12 @@ SPDX-License-Identifier: Apache-2.0
 package ssh
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -31,6 +33,10 @@ type AccessConfig struct {
 	// AutoDetected indicates if the public IPs of the user were automatically detected.
 	// AutoDetected is false in case the CIDRs were provided via flags.
 	AutoDetected bool
+
+	// Force will silence warnings and interactive prompts. The latter happens if the user
+	// specifies a /32/large/ CIDR range which usually requires the users confirmation.
+	Force bool
 }
 
 func (o *AccessConfig) Complete(f util.Factory, _ *cobra.Command, _ []string, ioStreams util.IOStreams) error {
@@ -68,8 +74,21 @@ func (o *AccessConfig) Validate() error {
 	}
 
 	for _, cidr := range o.CIDRs {
-		if _, _, err := net.ParseCIDR(cidr); err != nil {
+		_, netIP, err := net.ParseCIDR(cidr)
+		if err != nil {
 			return fmt.Errorf("CIDR %q is invalid: %w", cidr, err)
+		}
+
+		mask := []byte{0, 0, 0, 0}
+		if netIP.IP.To4() == nil { // not a IPv4 address -> probably IPv6
+			mask = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+		}
+
+		if !o.Force && bytes.Compare(netIP.Mask, mask) <= 0 {
+			question := fmt.Sprintf("Large CIDR range %q compromises security. Continue?", cidr)
+			if !util.ConfirmDialog(o.IOStreams, question, false) {
+				os.Exit(0)
+			}
 		}
 	}
 
