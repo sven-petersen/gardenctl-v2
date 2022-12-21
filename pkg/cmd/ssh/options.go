@@ -274,7 +274,7 @@ func (o *SSHOptions) Validate() error {
 		return err
 	}
 
-	if err := o.AccessConfig.Validate(); err != nil {
+	if err := o.AccessConfig.Validate(o.IOStreams); err != nil {
 		return err
 	}
 

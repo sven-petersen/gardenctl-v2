@@ -68,7 +68,7 @@ func (o *AccessConfig) Complete(f util.Factory, _ *cobra.Command, _ []string, io
 	return nil
 }
 
-func (o *AccessConfig) Validate() error {
+func (o *AccessConfig) Validate(ioStreams util.IOStreams) error {
 	if len(o.CIDRs) == 0 {
 		return errors.New("must at least specify a single CIDR to allow access to the bastion")
 	}
@@ -86,7 +86,7 @@ func (o *AccessConfig) Validate() error {
 
 		if !o.Force && bytes.Compare(netIP.Mask, mask) <= 0 {
 			question := fmt.Sprintf("Large CIDR range %q compromises security. Continue?", cidr)
-			if !util.ConfirmDialog(o.IOStreams, question, false) {
+			if !util.ConfirmDialog(ioStreams, question, false) {
 				os.Exit(0)
 			}
 		}
@@ -97,6 +97,7 @@ func (o *AccessConfig) Validate() error {
 
 func (o *AccessConfig) AddFlags(flags *pflag.FlagSet) {
 	flags.StringArrayVar(&o.CIDRs, "cidr", nil, "CIDRs to allow access to the bastion host; if not given, your system's public IPs (v4 and v6) are auto-detected.")
+	flags.BoolVar(&o.Force, "force", o.Force, "Do not show warnings and do not prompt for confirmation. Does not affect access control warnings.")
 }
 
 type (

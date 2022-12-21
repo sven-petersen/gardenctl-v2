@@ -21,6 +21,7 @@ gardenctl ssh-patch cli-xxxxxxxx
 ```
       --cidr stringArray   CIDRs to allow access to the bastion host; if not given, your system's public IPs (v4 and v6) are auto-detected.
       --control-plane      target control plane of shoot, use together with shoot argument
+      --force              Do not show warnings and do not prompt for confirmation. Does not affect access control warnings.
       --garden string      target the given garden cluster
   -h, --help               help for ssh-patch
       --project string     target the given project
